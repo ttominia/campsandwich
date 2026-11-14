@@ -44,8 +44,8 @@ body{color:var(--maroon);font-family:var(--body)}
 
 /* no-WebGL fallback: the still image */
 .no-gl #scene{display:none}
-.no-gl body, body.no-gl{background:var(--night) url("assets/scene-wide.jpg") center/cover no-repeat}
-@media (max-aspect-ratio: 9/10){ body.no-gl{background-image:url("assets/scene-tall.jpg")} }
+.no-gl body, body.no-gl{background:var(--night) url("assets/o2-scene-wide.jpg") center/cover no-repeat}
+@media (max-aspect-ratio: 9/10){ body.no-gl{background-image:url("assets/o2-scene-tall.jpg")} }
 
 @media (prefers-reduced-motion: reduce){ .tag{transition:opacity .4s ease} }
 </style>
@@ -56,7 +56,7 @@ body{color:var(--maroon);font-family:var(--body)}
 <h1 class="sr-only">Camp Sandwich Productions</h1>
 <a class="tag home" href="./">Home</a>
 <video id="film" src="assets/camp70s.mp4" muted loop playsinline autoplay preload="auto" style="display:none"></video>
-<noscript><style>body{background:#0a0f22 url("assets/scene-wide.jpg") center/cover no-repeat}.home{opacity:1;transform:none}</style></noscript>
+<noscript><style>body{background:#0a0f22 url("assets/o2-scene-wide.jpg") center/cover no-repeat}.home{opacity:1;transform:none}</style></noscript>
 
 <script type="module">
 import * as THREE from 'three';
@@ -65,23 +65,24 @@ import * as THREE from 'three';
 // Scene data, measured from the artwork. uv: x left→right, y bottom→top.
 // ------------------------------------------------------------------
 const SETS = {
+  // Option 2: Option2_1Web.png (1376x768); Option2Mobile.png (768x1376)
   wide: {
-    img: 'assets/scene-wide.jpg', depth: 'assets/depth-wide.jpg', aspect: 2400/1340, segs: [360, 200], D: 0.7,
-    sheet: [[0.4125,0.3940],[0.6354,0.3806],[0.6325,0.6881],[0.4083,0.6828]], // BL, BR, TR, TL
-    sheetAspect: 1.35,
-    fire: [0.275,0.30], fireR: [0.12,0.2],
-    flameC: [0.275,0.34], flameR: [0.075,0.15], flameBase: 0.21, flameTop: 0.48,
-    ember: [0.275,0.47],
-    beam: [[0.15,1.0],[0.36,0.62]], beamW: 0.05,
+    img: 'assets/o2-scene-wide.jpg', depth: 'assets/o2-depth-wide.jpg', aspect: 1376/768, segs: [344, 192], D: 0.7,
+    sheet: [[0.5472,0.3594],[0.6795,0.2995],[0.6926,0.5117],[0.5538,0.5599]], // BL, BR, TR, TL
+    sheetAspect: 1.18,
+    fire: [0.494,0.219], fireR: [0.10,0.17],
+    flameC: [0.494,0.284], flameR: [0.05,0.09], flameBase: 0.212, flameTop: 0.371,
+    ember: [0.494,0.362],
+    beam: [[0.145,1.03],[0.24,0.61]], beamW: 0.05,
   },
   tall: {
-    img: 'assets/scene-tall.jpg', depth: 'assets/depth-tall.jpg', aspect: 768/1376, segs: [150, 270], D: 0.6,
-    sheet: [[0.3490,0.3474],[0.7266,0.3445],[0.7188,0.5094],[0.3411,0.5073]],
-    sheetAspect: 1.29,
-    fire: [0.286,0.26], fireR: [0.22,0.12],
-    flameC: [0.286,0.27], flameR: [0.13,0.085], flameBase: 0.20, flameTop: 0.34,
-    ember: [0.286,0.335],
-    beam: [[0.13,0.97],[0.56,0.53]], beamW: 0.06,
+    img: 'assets/o2-scene-tall.jpg', depth: 'assets/o2-depth-tall.jpg', aspect: 768/1376, segs: [150, 270], D: 0.6,
+    sheet: [[0.5859,0.3219],[0.8229,0.2863],[0.8464,0.4113],[0.5977,0.4382]],
+    sheetAspect: 1.15,
+    fire: [0.488,0.244], fireR: [0.22,0.11],
+    flameC: [0.488,0.273], flameR: [0.10,0.06], flameBase: 0.237, flameTop: 0.306,
+    ember: [0.488,0.306],
+    beam: [[0.898,0.876],[0.651,0.564]], beamW: 0.06,
   },
 };
 const LOGO_BOX = [34/1376, 1-694/768, 1170/1376, 1-538/768]; // u0,v0,u1,v1 of the lettering inside logo.png
@@ -305,7 +306,8 @@ void main(){
   vec2 q = gl_PointCoord - 0.5;
   float d = length(q);
   float a = smoothstep(0.5, 0.15, d);
-  gl_FragColor = vec4(uColor * a * vA * uGain, 1.0);
+  float k = a * vA * uGain;
+  gl_FragColor = vec4(uColor * k, k);
 }`;
 const emberMat = new THREE.ShaderMaterial({
   vertexShader: pointVert, fragmentShader: pointFrag,
@@ -366,7 +368,8 @@ async function useSet(name) {
   uniforms.uFlameC.value.set(...s.flameC); uniforms.uFlameR.value.set(...s.flameR);
   uniforms.uFlameBase.value = s.flameBase; uniforms.uFlameTop.value = s.flameTop;
   uniforms.uBeam0.value.set(...s.beam[0]); uniforms.uBeam1.value.set(...s.beam[1]);
-  uniforms.uBeamW.value = name === 'wide' ? 0.09 : 0.07;   // half-width, in image-height units uniforms.uImgAspect.value = s.aspect;
+  uniforms.uBeamW.value = name === 'wide' ? 0.09 : 0.07;   // half-width, in image-height units
+  uniforms.uImgAspect.value = s.aspect;
   layout();
   seedDust();
   emberState.forEach(e => { e.age = 1; e.life = 0; });
@@ -485,7 +488,8 @@ function frame(now) {
   drift.x += (ptr.x - drift.x) * Math.min(1, dt * 2.2);
   drift.y += (ptr.y - drift.y) * Math.min(1, dt * 2.2);
   const bx = Math.sin(time * 0.23) * 0.05 * k, by = Math.sin(time * 0.31) * 0.03 * k;
-  const ox = fx * 0.45 * (1 - camP), oy = fy * 0.45 * (1 - camP);
+  const oy0 = ((set.focus ?? 0.5) - 0.5) * PLANE_H;   // resting view centre
+  const ox = fx * 0.45 * (1 - camP), oy = oy0 + (fy - oy0) * 0.45 * (1 - camP);
   const dz = dist0 * (0.74 + 0.26 * camP);
   const dX = (drift.x * 0.32 + bx) * camP * k, dY = (-drift.y * 0.18 + by) * camP * k;
   camera.position.set(ox + dX, oy + dY, dz);
