@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camp Sandwich Productions</title>
+<meta name="description" content="Camp Sandwich Productions. Delivering cinematic quality via focused direction and artisanal narrative structure.">
+<meta name="theme-color" content="#0a0f22">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Karla:wght@600&display=swap">
+<style>
+:root{
+  --night:#0a0f22;
+  --maroon:#6b0f12;
+  --felt:#efdfbd;
+  --display:"Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --body:"Karla", "Segoe UI", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--night);overflow:hidden}
+body{color:var(--maroon);font-family:var(--body)}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:pan-y}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+
+/* felt tags */
+.tag{
+  position:fixed;margin:0;color:var(--maroon);
+  background-color:var(--felt);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.5);
+  line-height:1.25;text-align:center;
+  opacity:0;transition:opacity .9s ease, transform 1.1s cubic-bezier(.2,1.4,.4,1);
+}
+.tag::after{content:"";position:absolute;inset:6px;border:1.5px dashed rgba(107,15,18,.5);border-radius:4px;pointer-events:none}
+.home{
+  top:calc(16px + env(safe-area-inset-top, 0px));right:calc(16px + env(safe-area-inset-right, 0px));
+  padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;
+  transform:translateY(-24px) rotate(6deg);
+}
+.home:focus-visible{outline:3px solid #e9b04c;outline-offset:3px}
+.show .home{opacity:1;transform:translateY(0) rotate(2.5deg)}
+
+/* no-WebGL fallback: the still image */
+.no-gl #scene{display:none}
+.no-gl body, body.no-gl{background:var(--night) url("assets/scene-wide.jpg") center/cover no-repeat}
+@media (max-aspect-ratio: 9/10){ body.no-gl{background-image:url("assets/scene-tall.jpg")} }
+
+@media (prefers-reduced-motion: reduce){ .tag{transition:opacity .4s ease} }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<h1 class="sr-only">Camp Sandwich Productions</h1>
+<a class="tag home" href="./">Home</a>
+<video id="film" src="assets/camp70s.mp4" muted loop playsinline autoplay preload="auto" style="display:none"></video>
+<noscript><style>body{background:#0a0f22 url("assets/scene-wide.jpg") center/cover no-repeat}.home{opacity:1;transform:none}</style></noscript>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ------------------------------------------------------------------
+// Scene data, measured from the artwork. uv: x left→right, y bottom→top.
+// ------------------------------------------------------------------
+const SETS = {
+  wide: {
+    img: 'assets/scene-wide.jpg', depth: 'assets/depth-wide.jpg', aspect: 2400/1340, segs: [360, 200], D: 0.7,
+    sheet: [[0.4125,0.3940],[0.6354,0.3806],[0.6325,0.6881],[0.4083,0.6828]], // BL, BR, TR, TL
+    sheetAspect: 1.35,
+    fire: [0.275,0.30], fireR: [0.12,0.2],
+    flameC: [0.275,0.34], flameR: [0.075,0.15], flameBase: 0.21, flameTop: 0.48,
+    ember: [0.275,0.47],
+    beam: [[0.15,1.0],[0.36,0.62]], beamW: 0.05,
+  },
+  tall: {
+    img: 'assets/scene-tall.jpg', depth: 'assets/depth-tall.jpg', aspect: 768/1376, segs: [150, 270], D: 0.6,
+    sheet: [[0.3490,0.3474],[0.7266,0.3445],[0.7188,0.5094],[0.3411,0.5073]],
+    sheetAspect: 1.29,
+    fire: [0.286,0.26], fireR: [0.22,0.12],
+    flameC: [0.286,0.27], flameR: [0.13,0.085], flameBase: 0.20, flameTop: 0.34,
+    ember: [0.286,0.335],
+    beam: [[0.13,0.97],[0.56,0.53]], beamW: 0.06,
+  },
+};
+const LOGO_BOX = [34/1376, 1-694/768, 1170/1376, 1-538/768]; // u0,v0,u1,v1 of the lettering inside logo.png
+const LOGO_ASPECT = (1170-34)/(694-538);
+const PLANE_H = 2, FOV = 30, OVERSCAN = 1.1;
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+// ------------------------------------------------------------------
+const canvas = document.getElementById('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+} catch (e) {
+  document.body.classList.add('no-gl', 'show');
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x0a0f22, 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(FOV, 1, 0.01, 50);
+
+// ---------------- textures ----------------
+const loader = new THREE.TextureLoader();
+const loadTex = url => new Promise((res, rej) => loader.load(url, t => { t.colorSpace = THREE.NoColorSpace; res(t); }, undefined, rej));
+function loadDepth(url) {
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const g = c.getContext('2d');
+      g.filter = 'blur(3px)';            // soften edges so the parallax doesn't tear
+      g.drawImage(im, 0, 0);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.NoColorSpace; t.generateMipmaps = false;
+      t.minFilter = t.magFilter = THREE.LinearFilter;
+      res(t);
+    };
+    im.onerror = rej; im.src = url;
+  });
+}
+
+const video = document.getElementById('film');
+const videoTex = new THREE.VideoTexture(video);
+videoTex.colorSpace = THREE.NoColorSpace;
+videoTex.minFilter = videoTex.magFilter = THREE.LinearFilter;
+videoTex.generateMipmaps = false;
+let videoReady = 0;
+const markReady = () => { if (video.readyState >= 2) videoReady = 1; };
+video.addEventListener('playing', markReady);
+video.addEventListener('loadeddata', markReady);
+const tryPlay = () => video.play().catch(() => {});
+tryPlay();
+addEventListener('pointerdown', tryPlay, { once: true });
+
+// ---------------- main diorama mesh ----------------
+const vert = /* glsl */`
+uniform sampler2D uDepth;
+uniform float uD, uDist;
+varying vec2 vUv;
+void main(){
+  vUv = uv;
+  float d = texture2D(uDepth, uv).r;
+  float z = (d - 1.0) * uD;
+  vec3 p = position;
+  p.xy *= (uDist - z) / uDist;   // keep the image undistorted from the resting camera
+  p.z = z;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+
+const frag = /* glsl */`
+precision highp float;
+uniform sampler2D uMap, uVideo, uPoster, uLogo;
+uniform float uTime, uVidReady, uAmbient, uFireOn, uPuff, uFlick, uSheetOn, uTitle;
+uniform vec2 uA, uB, uC, uDd;            // sheet corners BL, BR, TR, TL
+uniform float uSheetAspect, uVidAspect, uLogoAspect;
+uniform vec4 uLogoBox;
+uniform vec2 uFire, uFireR, uFlameC, uFlameR;
+uniform float uFlameBase, uFlameTop;
+uniform vec2 uBeam0, uBeam1;
+uniform float uBeamW, uImgAspect;
+uniform vec2 uRes;
+varying vec2 vUv;
+
+float cross2(vec2 a, vec2 b){ return a.x*b.y - a.y*b.x; }
+vec2 invBilinear(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){
+  vec2 e = b-a, f = d-a, g = a-b+c-d, h = p-a;
+  float k2 = cross2(g,f);
+  float k1 = cross2(e,f) + cross2(h,g);
+  float k0 = cross2(h,e);
+  if (abs(k2) < 1e-6) { float v = -k0/k1; return vec2((h.x - f.x*v)/(e.x + g.x*v), v); }
+  float w = k1*k1 - 4.0*k0*k2;
+  if (w < 0.0) return vec2(-9.0);
+  w = sqrt(w);
+  float ik2 = 0.5/k2;
+  float v = (-k1 - w)*ik2;
+  float u = (h.x - f.x*v)/(e.x + g.x*v);
+  if (u < -0.5 || u > 1.5 || v < -0.5 || v > 1.5) { v = (-k1 + w)*ik2; u = (h.x - f.x*v)/(e.x + g.x*v); }
+  return vec2(u, v);
+}
+float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+
+void main(){
+  vec2 uv = vUv;
+  vec2 sc = invBilinear(uv, uA, uB, uC, uDd);
+  float box = smoothstep(-0.07,-0.01,sc.x) * smoothstep(1.07,1.01,sc.x) * smoothstep(-0.09,-0.02,sc.y) * smoothstep(1.06,1.0,sc.y);
+
+  // breeze on the sheet: the bottom moves, the clothespinned top stays put
+  float sway = 1.0 - clamp(sc.y, 0.0, 1.0);
+  uv.y += sin(uTime*1.35 + sc.x*8.0) * 0.0011 * sway * box;
+  uv.x += sin(uTime*0.9 + sc.y*6.0) * 0.0006 * sway * box;
+
+  // flame area (used for the opening "puff")
+  vec2 fq = (uv - uFlameC) / uFlameR;
+  float fm = exp(-dot(fq,fq) * 1.1);
+
+  vec3 col = texture2D(uMap, uv).rgb;
+
+  // ---- moonbeam: slow drifting shafts and a gentle breathing glow ----
+  vec2 ua = vec2(uv.x * uImgAspect, uv.y);
+  vec2 b0 = vec2(uBeam0.x * uImgAspect, uBeam0.y), b1 = vec2(uBeam1.x * uImgAspect, uBeam1.y);
+  vec2 bd = b1 - b0; float blen = length(bd); bd /= blen;
+  vec2 bn = vec2(-bd.y, bd.x);
+  float along = dot(ua - b0, bd);
+  float across = dot(ua - b0, bn);
+  float spread = uBeamW * (0.7 + 1.1 * clamp(along / blen, 0.0, 1.4));   // the shafts fan out as they fall
+  float beam = smoothstep(spread, spread * 0.2, abs(across)) * smoothstep(-0.05, 0.12, along) * smoothstep(blen * 1.5, blen * 0.7, along);
+  float q = across / spread;
+  float shafts = 0.5 + 0.5 * sin(q * 9.0 + uTime * 0.45) * sin(q * 4.3 - uTime * 0.28 + 1.7);
+  float breathe = 0.88 + 0.12 * sin(uTime * 0.37) + 0.05 * sin(uTime * 0.93 + 2.0);
+  col *= 1.0 + beam * (shafts - 0.45) * 0.45;
+  col += vec3(0.55, 0.65, 0.95) * beam * shafts * 0.07 * breathe;
+
+  // ---- projection onto the sheet ----
+  float m = smoothstep(0.0,0.03,sc.x) * smoothstep(1.0,0.97,sc.x) * smoothstep(0.0,0.035,sc.y) * smoothstep(1.0,0.965,sc.y);
+  vec2 v2 = sc - 0.5;
+  if (uVidAspect > uSheetAspect) v2.x *= uSheetAspect/uVidAspect; else v2.y *= uVidAspect/uSheetAspect;
+  v2 += 0.5;
+  vec3 film = mix(texture2D(uPoster, v2).rgb, texture2D(uVideo, v2).rgb, uVidReady);
+  float Lw = 0.84;
+  float Lh = Lw * uSheetAspect / uLogoAspect;
+  vec2 lq = (sc - vec2(0.08, 0.40)) / vec2(Lw, Lh);
+  if (lq.x > 0.0 && lq.x < 1.0 && lq.y > 0.0 && lq.y < 1.0) {
+    vec4 lg = texture2D(uLogo, mix(uLogoBox.xy, uLogoBox.zw, lq));
+    film = mix(film, lg.rgb, lg.a * uTitle);
+  }
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  vec3 proj = film * mix(1.0, lum / 0.72, 0.55) * 1.06;     // keep the muslin's weave and wrinkles
+  vec3 unlit = col * vec3(0.30, 0.33, 0.42);
+  vec3 offCol = mix(col, unlit, box);
+  col = mix(offCol, mix(col, proj, m), uSheetOn);
+
+  // ---- firelight ----
+  vec2 fd = (uv - uFire) / uFireR;
+  float fglow = exp(-dot(fd,fd) * 1.4);
+  col *= 1.0 + fglow * (uFlick - 1.0) * 1.5 * uFireOn;
+  col += vec3(1.0, 0.42, 0.12) * fglow * 0.05 * uFlick * uFireOn;
+  col *= 1.0 + fm * uPuff * 0.6;
+
+  // ---- opening lights ----
+  float fireArea = exp(-dot(fd,fd) * 0.45);
+  float light = max(uAmbient, fireArea * uFireOn);
+  light = max(light, box * uSheetOn * 0.9);
+  col *= mix(0.025, 1.0, light);
+
+  // ---- lens: vignette + grain ----
+  vec2 sv = gl_FragCoord.xy / uRes;
+  float vg = smoothstep(1.05, 0.35, length((sv - 0.5) * vec2(uRes.x/uRes.y*0.7, 1.0)));
+  col *= mix(0.7, 1.0, vg);
+  col += (hash(gl_FragCoord.xy + fract(uTime*0.37)*913.0) - 0.5) * 0.028;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+const uniforms = {
+  uMap: { value: null }, uDepth: { value: null }, uVideo: { value: videoTex }, uPoster: { value: null }, uLogo: { value: null },
+  uD: { value: 0.7 }, uDist: { value: 4 },
+  uTime: { value: 0 }, uVidReady: { value: 0 }, uAmbient: { value: 0 }, uFireOn: { value: 0 }, uPuff: { value: 0 },
+  uFlick: { value: 1 }, uSheetOn: { value: 0 }, uTitle: { value: 0 },
+  uA: { value: new THREE.Vector2() }, uB: { value: new THREE.Vector2() }, uC: { value: new THREE.Vector2() }, uDd: { value: new THREE.Vector2() },
+  uSheetAspect: { value: 1.35 }, uVidAspect: { value: 16/9 }, uLogoAspect: { value: LOGO_ASPECT },
+  uLogoBox: { value: new THREE.Vector4(...LOGO_BOX) },
+  uFire: { value: new THREE.Vector2() }, uFireR: { value: new THREE.Vector2() },
+  uFlameC: { value: new THREE.Vector2() }, uFlameR: { value: new THREE.Vector2() },
+  uFlameBase: { value: 0 }, uFlameTop: { value: 1 },
+  uBeam0: { value: new THREE.Vector2() }, uBeam1: { value: new THREE.Vector2() }, uBeamW: { value: 0.1 }, uImgAspect: { value: 1 },
+  uRes: { value: new THREE.Vector2(1, 1) },
+};
+const dioramaMat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms });
+let diorama = null;
+
+// ---------------- embers ----------------
+const EMBERS = coarse ? 22 : 40;
+const emberGeo = new THREE.BufferGeometry();
+const ePos = new Float32Array(EMBERS * 3), eSize = new Float32Array(EMBERS), eAlpha = new Float32Array(EMBERS);
+emberGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
+emberGeo.setAttribute('aSize', new THREE.BufferAttribute(eSize, 1));
+emberGeo.setAttribute('aAlpha', new THREE.BufferAttribute(eAlpha, 1));
+const pointVert = /* glsl */`
+attribute float aSize; attribute float aAlpha;
+uniform float uPx, uTime;
+uniform float uDrift;
+varying float vA;
+void main(){
+  vec3 p = position;
+  float s = fract(sin(dot(position.xy, vec2(41.3, 17.7))) * 9137.0);
+  p.x += sin(uTime*0.21 + s*6.28) * 0.03 * uDrift;
+  p.y += sin(uTime*0.13 + s*4.10) * 0.04 * uDrift;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_PointSize = aSize * uPx / -mv.z;
+  vA = aAlpha * (uDrift > 0.5 ? (0.55 + 0.45*sin(uTime*1.3 + s*20.0)) : 1.0);
+  gl_Position = projectionMatrix * mv;
+}`;
+const pointFrag = /* glsl */`
+uniform vec3 uColor; uniform float uGain;
+varying float vA;
+void main(){
+  vec2 q = gl_PointCoord - 0.5;
+  float d = length(q);
+  float a = smoothstep(0.5, 0.15, d);
+  gl_FragColor = vec4(uColor * a * vA * uGain, 1.0);
+}`;
+const emberMat = new THREE.ShaderMaterial({
+  vertexShader: pointVert, fragmentShader: pointFrag,
+  uniforms: { uPx: { value: 500 }, uTime: { value: 0 }, uDrift: { value: 0 }, uColor: { value: new THREE.Color(1.0, 0.55, 0.18) }, uGain: { value: 1 } },
+  transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+const embers = new THREE.Points(emberGeo, emberMat);
+embers.frustumCulled = false; embers.renderOrder = 2;
+scene.add(embers);
+const emberState = Array.from({ length: EMBERS }, () => ({ x: 0, y: 0, vx: 0, vy: 0, age: 1, life: 0, size: 0, phase: Math.random()*6.28 }));
+
+// ---------------- moonbeam dust ----------------
+const DUST = coarse ? 45 : 80;
+const dustGeo = new THREE.BufferGeometry();
+const dPos = new Float32Array(DUST * 3), dSize = new Float32Array(DUST), dAlpha = new Float32Array(DUST);
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+dustGeo.setAttribute('aSize', new THREE.BufferAttribute(dSize, 1));
+dustGeo.setAttribute('aAlpha', new THREE.BufferAttribute(dAlpha, 1));
+const dustMat = new THREE.ShaderMaterial({
+  vertexShader: pointVert, fragmentShader: pointFrag,
+  uniforms: { uPx: { value: 500 }, uTime: { value: 0 }, uDrift: { value: 1 }, uColor: { value: new THREE.Color(0.78, 0.85, 1.0) }, uGain: { value: 0 } },
+  transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+});
+const dust = new THREE.Points(dustGeo, dustMat);
+dust.frustumCulled = false; dust.renderOrder = 1;
+scene.add(dust);
+
+// ---------------- set handling ----------------
+let set = null, setName = '', dist0 = 4, planeW = 2;
+const cache = {};
+let posterTex = null, logoTex = null;
+
+function uvToWorld(u, v, z = 0) {
+  const k = (dist0 - z) / dist0;
+  return [(u - 0.5) * planeW * k, (v - 0.5) * PLANE_H * k, z];
+}
+
+async function useSet(name) {
+  if (name === setName) return;
+  setName = name;
+  const s = SETS[name];
+  if (!cache[name]) cache[name] = Promise.all([loadTex(s.img), loadDepth(s.depth)]);
+  const [map, depth] = await cache[name];
+  if (setName !== name) return;
+  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  set = s;
+  planeW = PLANE_H * s.aspect;
+  if (diorama) { scene.remove(diorama); diorama.geometry.dispose(); }
+  const geo = new THREE.PlaneGeometry(planeW, PLANE_H, s.segs[0], s.segs[1]);
+  diorama = new THREE.Mesh(geo, dioramaMat);
+  diorama.frustumCulled = false;
+  scene.add(diorama);
+  uniforms.uMap.value = map; uniforms.uDepth.value = depth; uniforms.uD.value = s.D;
+  uniforms.uA.value.set(...s.sheet[0]); uniforms.uB.value.set(...s.sheet[1]);
+  uniforms.uC.value.set(...s.sheet[2]); uniforms.uDd.value.set(...s.sheet[3]);
+  uniforms.uSheetAspect.value = s.sheetAspect;
+  uniforms.uFire.value.set(...s.fire); uniforms.uFireR.value.set(...s.fireR);
+  uniforms.uFlameC.value.set(...s.flameC); uniforms.uFlameR.value.set(...s.flameR);
+  uniforms.uFlameBase.value = s.flameBase; uniforms.uFlameTop.value = s.flameTop;
+  uniforms.uBeam0.value.set(...s.beam[0]); uniforms.uBeam1.value.set(...s.beam[1]);
+  uniforms.uBeamW.value = name === 'wide' ? 0.09 : 0.07;   // half-width, in image-height units uniforms.uImgAspect.value = s.aspect;
+  layout();
+  seedDust();
+  emberState.forEach(e => { e.age = 1; e.life = 0; });
+}
+
+function seedDust() {
+  const [[u0, v0], [u1, v1]] = set.beam;
+  const dx = u1 - u0, dy = v1 - v0, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+  for (let i = 0; i < DUST; i++) {
+    const t = Math.random(), w = (Math.random() - 0.5) * 2 * set.beamW * (0.6 + t);
+    const [x, y, z] = uvToWorld(u0 + dx * t + nx * w, v0 + dy * t + ny * w * set.aspect, -0.3);
+    dPos.set([x, y, z], i * 3);
+    dSize[i] = 0.006 + Math.random() * 0.01;
+    dAlpha[i] = 0.25 + Math.random() * 0.6;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+  dustGeo.attributes.aSize.needsUpdate = true;
+  dustGeo.attributes.aAlpha.needsUpdate = true;
+}
+
+function layout() {
+  const w = innerWidth, h = innerHeight, A = w / h;
+  renderer.setSize(w, h, false);
+  camera.aspect = A;
+  camera.updateProjectionMatrix();
+  if (set) {
+    const hv = Math.min(PLANE_H, planeW / A) / OVERSCAN;
+    dist0 = (hv / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    uniforms.uDist.value = dist0;
+  }
+  const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+  uniforms.uRes.value.copy(buf);
+  const px = buf.y / (2 * Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+  emberMat.uniforms.uPx.value = px; dustMat.uniforms.uPx.value = px;
+}
+
+const pickSet = () => (innerWidth / innerHeight < 0.9 ? 'tall' : 'wide');
+let rt;
+addEventListener('resize', () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => { const n = pickSet(); if (n !== setName) useSet(n); else layout(); }, 80);
+});
+
+// ---------------- pointer / tilt drift ----------------
+const ptr = { x: 0, y: 0 }, drift = { x: 0, y: 0 };
+addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { ptr.x = e.clientX / innerWidth * 2 - 1; ptr.y = e.clientY / innerHeight * 2 - 1; } });
+document.addEventListener('mouseleave', () => { ptr.x = 0; ptr.y = 0; });
+function onTilt(e) {
+  if (e.gamma == null) return;
+  ptr.x = Math.max(-1, Math.min(1, e.gamma / 25));
+  ptr.y = Math.max(-1, Math.min(1, (e.beta - 45) / 25));
+}
+if (window.DeviceOrientationEvent) {
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    addEventListener('touchend', () => DeviceOrientationEvent.requestPermission().then(s => { if (s === 'granted') addEventListener('deviceorientation', onTilt); }).catch(() => {}), { once: true });
+  } else {
+    addEventListener('deviceorientation', onTilt);
+  }
+}
+
+// ---------------- timeline helpers ----------------
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const rnd = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
+
+// ---------------- start ----------------
+await Promise.all([
+  loadTex('assets/poster.png').then(t => { posterTex = t; uniforms.uPoster.value = t; }),
+  loadTex('assets/logo.png').then(t => { logoTex = t; uniforms.uLogo.value = t; }),
+  useSet(pickSet()),
+]);
+renderer.compile(scene, camera);
+
+let start = performance.now(), last = start, tagsShown = false;
+const look = new THREE.Vector3();
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!set) return;
+  const time = now / 1000;
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const t = reduceMotion ? 20 : (now - start) / 1000;
+
+  // opening sequence
+  const fireT = clamp01((t - 0.6) / 0.8);
+  const fireOn = t < 0.6 ? 0 : Math.min(1.15, easeOutBack(fireT));
+  const puff = fireT > 0 && fireT < 1 ? Math.sin(fireT * Math.PI) : 0;
+  const ambient = smooth(1.3, 3.0, t);
+  let sheetOn = 0;
+  if (t > 2.0) {
+    const base = clamp01((t - 2.0) / 1.0);
+    sheetOn = base < 1 ? (rnd(Math.floor(t * 14)) > 0.4 ? base : base * 0.15) : 1;
+    sheetOn *= 1 - 0.035 * rnd(Math.floor(time * 24));   // projector shimmer
+  }
+  const title = smooth(3.0, 3.9, t);
+  if (!tagsShown && t > 3.5) { tagsShown = true; document.body.classList.add('show'); }
+
+  const flick = 1 + 0.07 * Math.sin(time * 13) + 0.05 * Math.sin(time * 7.7 + 1) + 0.04 * Math.sin(time * 23 + 2) + 0.03 * (rnd(Math.floor(time * 18)) - 0.5);
+
+  uniforms.uTime.value = time;
+  uniforms.uFireOn.value = Math.min(1, fireOn);
+  uniforms.uPuff.value = puff * 0.8 + Math.max(0, fireOn - 1) * 2;
+  uniforms.uAmbient.value = ambient;
+  uniforms.uSheetOn.value = sheetOn;
+  uniforms.uTitle.value = title;
+  uniforms.uFlick.value = flick;
+  uniforms.uVidReady.value += (videoReady - uniforms.uVidReady.value) * Math.min(1, dt * 3);
+  if (video.videoWidth) uniforms.uVidAspect.value = video.videoWidth / video.videoHeight;
+
+  // camera: push out from the fire, then drift with the mouse / tilt
+  const camP = easeInOut(clamp01(t / 4.4));
+  const [fx, fy] = uvToWorld(set.fire[0], set.fire[1] + 0.06);
+  const k = reduceMotion ? 0 : 1;
+  drift.x += (ptr.x - drift.x) * Math.min(1, dt * 2.2);
+  drift.y += (ptr.y - drift.y) * Math.min(1, dt * 2.2);
+  const bx = Math.sin(time * 0.23) * 0.05 * k, by = Math.sin(time * 0.31) * 0.03 * k;
+  const ox = fx * 0.45 * (1 - camP), oy = fy * 0.45 * (1 - camP);
+  const dz = dist0 * (0.74 + 0.26 * camP);
+  const dX = (drift.x * 0.32 + bx) * camP * k, dY = (-drift.y * 0.18 + by) * camP * k;
+  camera.position.set(ox + dX, oy + dY, dz);
+  look.set(ox, oy, -set.D * 0.5);
+  camera.lookAt(look);
+
+  // embers
+  const [ex, ey] = uvToWorld(set.ember[0], set.ember[1], 0.02);
+  const spread = planeW * 0.012;
+  emberState.forEach((e, i) => {
+    e.age += dt;
+    if (e.age > e.life) {
+      if (uniforms.uFireOn.value > 0.3 && Math.random() < 0.6) {
+        e.x = ex + (Math.random() - 0.5) * spread * 3; e.y = ey - Math.random() * 0.05;
+        e.vx = (Math.random() - 0.5) * 0.02; e.vy = 0.07 + Math.random() * 0.1;
+        e.age = 0; e.life = 1.8 + Math.random() * 2.6; e.size = 0.007 + Math.random() * 0.01;
+      } else { eAlpha[i] = 0; return; }
+    }
+    const lt = e.age / e.life;
+    e.x += (e.vx + Math.sin(time * 2 + e.phase) * 0.012) * dt;
+    e.y += e.vy * dt * (reduceMotion ? 0.5 : 1);
+    ePos[i * 3] = e.x; ePos[i * 3 + 1] = e.y; ePos[i * 3 + 2] = 0.02;
+    eSize[i] = e.size * (1 - lt * 0.6);
+    eAlpha[i] = Math.sin(lt * Math.PI) * (0.6 + 0.4 * Math.sin(time * 9 + e.phase));
+  });
+  emberGeo.attributes.position.needsUpdate = true;
+  emberGeo.attributes.aSize.needsUpdate = true;
+  emberGeo.attributes.aAlpha.needsUpdate = true;
+  emberMat.uniforms.uTime.value = time;
+  emberMat.uniforms.uGain.value = uniforms.uFireOn.value;
+
+  dustMat.uniforms.uTime.value = time;
+  dustMat.uniforms.uGain.value = ambient * 0.9;
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
