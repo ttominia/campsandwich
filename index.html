@@ -67,7 +67,7 @@ import * as THREE from 'three';
 const SETS = {
   // Option 2: Option2_1Web.png (1376x768); Option2Mobile.png (768x1376)
   wide: {
-    img: 'assets/o2-scene-wide.jpg', depth: 'assets/o2-depth-wide.jpg', aspect: 1376/768, segs: [344, 192], D: 0.7,
+    img: 'assets/o2-scene-wide.jpg', depth: 'assets/o2-depth-wide.jpg', sway: 'assets/o2-sway-wide.png', aspect: 1376/768, segs: [344, 192], D: 0.7,
     sheet: [[0.5472,0.3594],[0.6795,0.2995],[0.6926,0.5117],[0.5538,0.5599]], // BL, BR, TR, TL
     sheetAspect: 1.18,
     fire: [0.494,0.219], fireR: [0.10,0.17],
@@ -76,7 +76,7 @@ const SETS = {
     beam: [[0.145,1.03],[0.24,0.61]], beamW: 0.05,
   },
   tall: {
-    img: 'assets/o2-scene-tall.jpg', depth: 'assets/o2-depth-tall.jpg', aspect: 768/1376, segs: [150, 270], D: 0.6,
+    img: 'assets/o2-scene-tall.jpg', depth: 'assets/o2-depth-tall.jpg', sway: 'assets/o2-sway-tall.png', aspect: 768/1376, segs: [150, 270], D: 0.6,
     sheet: [[0.5859,0.3219],[0.8229,0.2863],[0.8464,0.4113],[0.5977,0.4382]],
     sheetAspect: 1.15,
     fire: [0.488,0.244], fireR: [0.22,0.11],
@@ -158,7 +158,7 @@ void main(){
 
 const frag = /* glsl */`
 precision highp float;
-uniform sampler2D uMap, uVideo, uPoster, uLogo;
+uniform sampler2D uMap, uVideo, uPoster, uLogo, uSway;
 uniform float uTime, uVidReady, uAmbient, uFireOn, uPuff, uFlick, uSheetOn, uTitle;
 uniform vec2 uA, uB, uC, uDd;            // sheet corners BL, BR, TR, TL
 uniform float uSheetAspect, uVidAspect, uLogoAspect;
@@ -202,6 +202,16 @@ void main(){
   vec2 fq = (uv - uFlameC) / uFlameR;
   float fm = exp(-dot(fq,fq) * 1.1);
 
+  // ---- breeze: the flowers, clover and ferns sway (uSway marks them; everything else stays put) ----
+  float sw = texture2D(uSway, uv).r;
+  if (sw > 0.001) {
+    vec2 cell = uv * vec2(uImgAspect, 1.0) * 7.0;                          // neighbouring plants move out of step
+    float ph = fract(sin(dot(floor(cell), vec2(12.9898, 78.233))) * 43758.5453) * 6.2832;
+    float gust = 0.55 + 0.45 * sin(uTime * 0.31 - uv.x * 3.0) * sin(uTime * 0.13 + 1.7);   // slow gusts rolling across
+    float sx = sin(uTime * 1.15 + ph + uv.y * 6.0) * 0.7 + sin(uTime * 2.3 + ph * 1.7 + uv.x * 13.0) * 0.3;
+    float sy = sin(uTime * 1.6 + ph * 0.7 + uv.x * 9.0) * 0.35;
+    uv += vec2(sx / uImgAspect, sy) * 0.0034 * gust * sw;
+  }
   vec3 col = texture2D(uMap, uv).rgb;
 
   // ---- moonbeam: slow drifting shafts and a gentle breathing glow ----
@@ -261,7 +271,7 @@ void main(){
 }`;
 
 const uniforms = {
-  uMap: { value: null }, uDepth: { value: null }, uVideo: { value: videoTex }, uPoster: { value: null }, uLogo: { value: null },
+  uMap: { value: null }, uDepth: { value: null }, uSway: { value: null }, uVideo: { value: videoTex }, uPoster: { value: null }, uLogo: { value: null },
   uD: { value: 0.7 }, uDist: { value: 4 },
   uTime: { value: 0 }, uVidReady: { value: 0 }, uAmbient: { value: 0 }, uFireOn: { value: 0 }, uPuff: { value: 0 },
   uFlick: { value: 1 }, uSheetOn: { value: 0 }, uTitle: { value: 0 },
@@ -349,8 +359,8 @@ async function useSet(name) {
   if (name === setName) return;
   setName = name;
   const s = SETS[name];
-  if (!cache[name]) cache[name] = Promise.all([loadTex(s.img), loadDepth(s.depth)]);
-  const [map, depth] = await cache[name];
+  if (!cache[name]) cache[name] = Promise.all([loadTex(s.img), loadDepth(s.depth), loadTex(s.sway)]);
+  const [map, depth, sway] = await cache[name];
   if (setName !== name) return;
   map.anisotropy = renderer.capabilities.getMaxAnisotropy();
   set = s;
@@ -360,7 +370,7 @@ async function useSet(name) {
   diorama = new THREE.Mesh(geo, dioramaMat);
   diorama.frustumCulled = false;
   scene.add(diorama);
-  uniforms.uMap.value = map; uniforms.uDepth.value = depth; uniforms.uD.value = s.D;
+  uniforms.uMap.value = map; uniforms.uDepth.value = depth; uniforms.uSway.value = sway; uniforms.uD.value = s.D;
   uniforms.uA.value.set(...s.sheet[0]); uniforms.uB.value.set(...s.sheet[1]);
   uniforms.uC.value.set(...s.sheet[2]); uniforms.uDd.value.set(...s.sheet[3]);
   uniforms.uSheetAspect.value = s.sheetAspect;
