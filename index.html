@@ -44,8 +44,8 @@ body{color:var(--maroon);font-family:var(--body)}
 
 /* no-WebGL fallback: the still image */
 .no-gl #scene{display:none}
-.no-gl body, body.no-gl{background:var(--night) url("assets/o2-scene-wide.jpg") center/cover no-repeat}
-@media (max-aspect-ratio: 9/10){ body.no-gl{background-image:url("assets/o2-scene-tall.jpg")} }
+.no-gl body, body.no-gl{background:var(--night) url("assets/cf-scene-wide.jpg") center/cover no-repeat}
+@media (max-aspect-ratio: 9/10){ body.no-gl{background-image:url("assets/cf-scene-tall.jpg")} }
 
 @media (prefers-reduced-motion: reduce){ .tag{transition:opacity .4s ease} }
 </style>
@@ -56,7 +56,7 @@ body{color:var(--maroon);font-family:var(--body)}
 <h1 class="sr-only">Camp Sandwich Productions</h1>
 <a class="tag home" href="./">Home</a>
 <video id="film" src="assets/camp70s.mp4" muted loop playsinline autoplay preload="auto" style="display:none"></video>
-<noscript><style>body{background:#0a0f22 url("assets/o2-scene-wide.jpg") center/cover no-repeat}.home{opacity:1;transform:none}</style></noscript>
+<noscript><style>body{background:#0a0f22 url("assets/cf-scene-wide.jpg") center/cover no-repeat}.home{opacity:1;transform:none}</style></noscript>
 
 <script type="module">
 import * as THREE from 'three';
@@ -65,24 +65,26 @@ import * as THREE from 'three';
 // Scene data, measured from the artwork. uv: x left→right, y bottom→top.
 // ------------------------------------------------------------------
 const SETS = {
-  // Option 2: Option2_1Web.png (1376x768); Option2Mobile.png (768x1376)
+  // "CorrectFlora2" April scene: CorrectFlora2Desktop.png / CorrectFlora2Mobile.png (5504x3072), exported at half size
   wide: {
-    img: 'assets/o2-scene-wide.jpg', depth: 'assets/o2-depth-wide.jpg', sway: 'assets/o2-sway-wide.png', aspect: 1376/768, segs: [344, 192], D: 0.7,
-    sheet: [[0.5472,0.3594],[0.6795,0.2995],[0.6926,0.5117],[0.5538,0.5599]], // BL, BR, TR, TL
-    sheetAspect: 1.18,
-    fire: [0.494,0.219], fireR: [0.10,0.17],
-    flameC: [0.494,0.284], flameR: [0.05,0.09], flameBase: 0.212, flameTop: 0.371,
-    ember: [0.494,0.362],
-    beam: [[0.145,1.03],[0.24,0.61]], beamW: 0.05,
+    img: 'assets/cf-scene-wide.jpg', depth: 'assets/cf-depth-wide.jpg', sway: 'assets/cf-sway-wide.png', aspect: 2752/1536, segs: [344, 192], D: 0.7,
+    sheet: [[0.5749,0.4909],[0.7478,0.4531],[0.7540,0.7448],[0.5741,0.7624]], // BL, BR, TR, TL
+    sheetAspect: 1.14,
+    fire: [0.504,0.309], fireR: [0.12,0.20],
+    flameC: [0.504,0.379], flameR: [0.05,0.09], flameBase: 0.296, flameTop: 0.465,
+    ember: [0.504,0.452],
+    beam: [[0.3786,0.5544],[0.6627,0.6128]], beamW: [0.012, 0.15],  // projector lens -> screen centre; half-width at each end (image-height units)
+    fogY: [0.62, 0.95],                                              // mist hugs the far trunk bases, thinning above
   },
   tall: {
-    img: 'assets/o2-scene-tall.jpg', depth: 'assets/o2-depth-tall.jpg', sway: 'assets/o2-sway-tall.png', aspect: 768/1376, segs: [150, 270], D: 0.6,
-    sheet: [[0.5859,0.3219],[0.8229,0.2863],[0.8464,0.4113],[0.5977,0.4382]],
-    sheetAspect: 1.15,
-    fire: [0.488,0.244], fireR: [0.22,0.11],
-    flameC: [0.488,0.273], flameR: [0.10,0.06], flameBase: 0.237, flameTop: 0.306,
-    ember: [0.488,0.306],
-    beam: [[0.898,0.876],[0.651,0.564]], beamW: 0.06,
+    img: 'assets/cf-scene-tall.jpg', depth: 'assets/cf-depth-tall.jpg', sway: 'assets/cf-sway-tall.png', aspect: 1536/2752, segs: [150, 270], D: 0.6,
+    sheet: [[0.6042,0.4549],[0.8542,0.4331],[0.8646,0.5603],[0.6055,0.5719]],
+    sheetAspect: 1.16,
+    fire: [0.503,0.343], fireR: [0.24,0.12],
+    flameC: [0.503,0.375], flameR: [0.10,0.05], flameBase: 0.332, flameTop: 0.416,
+    ember: [0.503,0.411],
+    beam: [[0.316,0.473],[0.7321,0.5051]], beamW: [0.008, 0.07],
+    fogY: [0.58, 0.95],
   },
 };
 const LOGO_BOX = [34/1376, 1-694/768, 1170/1376, 1-538/768]; // u0,v0,u1,v1 of the lettering inside logo.png
@@ -158,15 +160,16 @@ void main(){
 
 const frag = /* glsl */`
 precision highp float;
-uniform sampler2D uMap, uVideo, uPoster, uLogo, uSway;
-uniform float uTime, uVidReady, uAmbient, uFireOn, uPuff, uFlick, uSheetOn, uTitle;
+uniform sampler2D uMap, uVideo, uPoster, uLogo, uSway, uDepth;
+uniform float uTime, uVidReady, uAmbient, uFireOn, uPuff, uFlick, uSheetOn, uTitle, uBeamFlick;
+uniform vec2 uFogY;
 uniform vec2 uA, uB, uC, uDd;            // sheet corners BL, BR, TR, TL
 uniform float uSheetAspect, uVidAspect, uLogoAspect;
 uniform vec4 uLogoBox;
 uniform vec2 uFire, uFireR, uFlameC, uFlameR;
 uniform float uFlameBase, uFlameTop;
-uniform vec2 uBeam0, uBeam1;
-uniform float uBeamW, uImgAspect;
+uniform vec2 uBeam0, uBeam1, uBeamW;
+uniform float uImgAspect;
 uniform vec2 uRes;
 varying vec2 vUv;
 
@@ -187,6 +190,12 @@ vec2 invBilinear(vec2 p, vec2 a, vec2 b, vec2 c, vec2 d){
   return vec2(u, v);
 }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(hash(i), hash(i+vec2(1.0,0.0)), f.x), mix(hash(i+vec2(0.0,1.0)), hash(i+vec2(1.0,1.0)), f.x), f.y);
+}
+float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ s += a * vnoise(p); p = p*2.03 + 17.1; a *= 0.5; } return s; }
 
 void main(){
   vec2 uv = vUv;
@@ -210,24 +219,34 @@ void main(){
     float gust = 0.55 + 0.45 * sin(uTime * 0.31 - uv.x * 3.0) * sin(uTime * 0.13 + 1.7);   // slow gusts rolling across
     float sx = sin(uTime * 1.15 + ph + uv.y * 6.0) * 0.7 + sin(uTime * 2.3 + ph * 1.7 + uv.x * 13.0) * 0.3;
     float sy = sin(uTime * 1.6 + ph * 0.7 + uv.x * 9.0) * 0.35;
-    uv += vec2(sx / uImgAspect, sy) * 0.0034 * gust * sw;
+    uv += vec2(sx / uImgAspect, sy) * 0.0024 * gust * sw;   // sw is height-weighted: tall plants and their tips move most
   }
   vec3 col = texture2D(uMap, uv).rgb;
 
-  // ---- moonbeam: slow drifting shafts and a gentle breathing glow ----
+  // ---- fog: slow mist crawling between the far trunks (far = dark in the depth map) ----
   vec2 ua = vec2(uv.x * uImgAspect, uv.y);
+  float dep = texture2D(uDepth, uv).r;
+  float far = smoothstep(0.48, 0.10, dep);
+  if (far > 0.001) {
+    float low = mix(1.0, 0.22, smoothstep(uFogY.x, uFogY.y, uv.y));     // thickest low down, thin wisps higher up
+    vec2 fp = vec2(ua.x * 2.2, ua.y * 5.5);
+    float n1 = fbm(fp + vec2(-uTime * 0.026, sin(uTime * 0.05) * 0.15));
+    float n2 = fbm(fp * 1.7 + vec2(-uTime * 0.041 + 5.3, 2.1));
+    float fogN = smoothstep(0.38, 0.82, n1 * 0.65 + n2 * 0.45);
+    col = mix(col, vec3(0.34, 0.40, 0.53), far * low * fogN * 0.42);
+  }
+
+  // ---- projector beam: a soft cone from the lens to the screen, flickering with the film ----
   vec2 b0 = vec2(uBeam0.x * uImgAspect, uBeam0.y), b1 = vec2(uBeam1.x * uImgAspect, uBeam1.y);
   vec2 bd = b1 - b0; float blen = length(bd); bd /= blen;
   vec2 bn = vec2(-bd.y, bd.x);
-  float along = dot(ua - b0, bd);
+  float bt = dot(ua - b0, bd) / blen;
   float across = dot(ua - b0, bn);
-  float spread = uBeamW * (0.7 + 1.1 * clamp(along / blen, 0.0, 1.4));   // the shafts fan out as they fall
-  float beam = smoothstep(spread, spread * 0.2, abs(across)) * smoothstep(-0.05, 0.12, along) * smoothstep(blen * 1.5, blen * 0.7, along);
-  float q = across / spread;
-  float shafts = 0.5 + 0.5 * sin(q * 9.0 + uTime * 0.45) * sin(q * 4.3 - uTime * 0.28 + 1.7);
-  float breathe = 0.88 + 0.12 * sin(uTime * 0.37) + 0.05 * sin(uTime * 0.93 + 2.0);
-  col *= 1.0 + beam * (shafts - 0.45) * 0.45;
-  col += vec3(0.55, 0.65, 0.95) * beam * shafts * 0.07 * breathe;
+  float half_ = mix(uBeamW.x, uBeamW.y, clamp(bt, 0.0, 1.0));
+  float cone = smoothstep(half_, half_ * 0.25, abs(across)) * smoothstep(0.0, 0.07, bt) * smoothstep(1.0, 0.86, bt);
+  float rays = 0.8 + 0.2 * sin(across / max(half_, 1e-3) * 11.0 + uTime * 0.35) * sin(across / max(half_, 1e-3) * 5.0 - uTime * 0.21 + 1.3);
+  col *= mix(1.0, 0.8, cone * (1.0 - uSheetOn));                          // the painted beam dims while the projector is off
+  col += vec3(1.0, 0.82, 0.58) * cone * rays * 0.05 * uBeamFlick * uSheetOn;
 
   // ---- projection onto the sheet ----
   float m = smoothstep(0.0,0.03,sc.x) * smoothstep(1.0,0.97,sc.x) * smoothstep(0.0,0.035,sc.y) * smoothstep(1.0,0.965,sc.y);
@@ -281,7 +300,8 @@ const uniforms = {
   uFire: { value: new THREE.Vector2() }, uFireR: { value: new THREE.Vector2() },
   uFlameC: { value: new THREE.Vector2() }, uFlameR: { value: new THREE.Vector2() },
   uFlameBase: { value: 0 }, uFlameTop: { value: 1 },
-  uBeam0: { value: new THREE.Vector2() }, uBeam1: { value: new THREE.Vector2() }, uBeamW: { value: 0.1 }, uImgAspect: { value: 1 },
+  uBeam0: { value: new THREE.Vector2() }, uBeam1: { value: new THREE.Vector2() }, uBeamW: { value: new THREE.Vector2(0.01, 0.1) }, uImgAspect: { value: 1 },
+  uBeamFlick: { value: 1 }, uFogY: { value: new THREE.Vector2(0.6, 0.95) },
   uRes: { value: new THREE.Vector2(1, 1) },
 };
 const dioramaMat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms });
@@ -338,7 +358,7 @@ dustGeo.setAttribute('aSize', new THREE.BufferAttribute(dSize, 1));
 dustGeo.setAttribute('aAlpha', new THREE.BufferAttribute(dAlpha, 1));
 const dustMat = new THREE.ShaderMaterial({
   vertexShader: pointVert, fragmentShader: pointFrag,
-  uniforms: { uPx: { value: 500 }, uTime: { value: 0 }, uDrift: { value: 1 }, uColor: { value: new THREE.Color(0.78, 0.85, 1.0) }, uGain: { value: 0 } },
+  uniforms: { uPx: { value: 500 }, uTime: { value: 0 }, uDrift: { value: 1 }, uColor: { value: new THREE.Color(1.0, 0.86, 0.62) }, uGain: { value: 0 } },
   transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
 });
 const dust = new THREE.Points(dustGeo, dustMat);
@@ -378,22 +398,25 @@ async function useSet(name) {
   uniforms.uFlameC.value.set(...s.flameC); uniforms.uFlameR.value.set(...s.flameR);
   uniforms.uFlameBase.value = s.flameBase; uniforms.uFlameTop.value = s.flameTop;
   uniforms.uBeam0.value.set(...s.beam[0]); uniforms.uBeam1.value.set(...s.beam[1]);
-  uniforms.uBeamW.value = name === 'wide' ? 0.09 : 0.07;   // half-width, in image-height units
+  uniforms.uBeamW.value.set(...s.beamW);
+  uniforms.uFogY.value.set(...s.fogY);
   uniforms.uImgAspect.value = s.aspect;
   layout();
   seedDust();
   emberState.forEach(e => { e.age = 1; e.life = 0; });
 }
 
+// dust drifting in the projector beam (worked out in aspect-correct image space, then back to uv)
 function seedDust() {
-  const [[u0, v0], [u1, v1]] = set.beam;
-  const dx = u1 - u0, dy = v1 - v0, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+  const A = set.aspect, [[u0, v0], [u1, v1]] = set.beam, [w0, w1] = set.beamW;
+  const ax = u0 * A, ay = v0, dx = u1 * A - ax, dy = v1 - ay, len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
   for (let i = 0; i < DUST; i++) {
-    const t = Math.random(), w = (Math.random() - 0.5) * 2 * set.beamW * (0.6 + t);
-    const [x, y, z] = uvToWorld(u0 + dx * t + nx * w, v0 + dy * t + ny * w * set.aspect, -0.3);
+    const t = 0.12 + Math.random() * 0.8, w = (Math.random() - 0.5) * 1.4 * (w0 + (w1 - w0) * t);
+    const px = ax + dx * t + nx * w, py = ay + dy * t + ny * w;
+    const [x, y, z] = uvToWorld(px / A, py, -0.28);
     dPos.set([x, y, z], i * 3);
-    dSize[i] = 0.006 + Math.random() * 0.01;
-    dAlpha[i] = 0.25 + Math.random() * 0.6;
+    dSize[i] = 0.004 + Math.random() * 0.007;
+    dAlpha[i] = 0.2 + Math.random() * 0.55;
   }
   dustGeo.attributes.position.needsUpdate = true;
   dustGeo.attributes.aSize.needsUpdate = true;
@@ -476,6 +499,8 @@ function frame(now) {
     sheetOn = base < 1 ? (rnd(Math.floor(t * 14)) > 0.4 ? base : base * 0.15) : 1;
     sheetOn *= 1 - 0.035 * rnd(Math.floor(time * 24));   // projector shimmer
   }
+  // the beam flickers frame by frame like a real film projector, with a slow lamp "breath" under it
+  const beamFlick = 0.82 + 0.18 * rnd(Math.floor(time * 24) + 0.5) + 0.06 * Math.sin(time * 0.7);
   const title = smooth(3.0, 3.9, t);
   if (!tagsShown && t > 3.5) { tagsShown = true; document.body.classList.add('show'); }
 
@@ -488,6 +513,7 @@ function frame(now) {
   uniforms.uSheetOn.value = sheetOn;
   uniforms.uTitle.value = title;
   uniforms.uFlick.value = flick;
+  uniforms.uBeamFlick.value = reduceMotion ? 1 : beamFlick;
   uniforms.uVidReady.value += (videoReady - uniforms.uVidReady.value) * Math.min(1, dt * 3);
   if (video.videoWidth) uniforms.uVidAspect.value = video.videoWidth / video.videoHeight;
 
@@ -532,7 +558,7 @@ function frame(now) {
   emberMat.uniforms.uGain.value = uniforms.uFireOn.value;
 
   dustMat.uniforms.uTime.value = time;
-  dustMat.uniforms.uGain.value = ambient * 0.9;
+  dustMat.uniforms.uGain.value = sheetOn * 0.7;
 
   renderer.render(scene, camera);
 }
