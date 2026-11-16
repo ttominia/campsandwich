@@ -73,11 +73,82 @@ body{color:var(--maroon);font-family:var(--body)}
 .home:focus-visible{outline:3px solid #e9b04c;outline-offset:3px}
 .show .home{opacity:1;transform:translateY(0) rotate(2.5deg)}
 /* About and Contact: on display only for now, not links yet */
-.about, .contact{cursor:default;user-select:none}
+.about{cursor:default;user-select:none}
+.contact:focus-visible{outline:3px solid #e9b04c;outline-offset:3px}
 .about{transform:translateY(-24px) rotate(4deg);transition-delay:.1s}
 .show .about{opacity:1;transform:translateY(-1px) rotate(1deg)}
 .contact{transform:translateY(-24px) rotate(-6deg);transition-delay:.2s}
 .show .contact{opacity:1;transform:translateY(2px) rotate(-2deg)}
+
+/* ---------------- screening room: click the screen, dive in, browse the gallery ---------------- */
+#scene.hot{cursor:pointer}
+.gallery{
+  position:fixed;left:0;right:0;bottom:0;z-index:2;
+  display:flex;gap:18px;align-items:flex-end;
+  padding:22px max(18px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+  filter:drop-shadow(0 5px 9px rgba(0,0,0,.5));
+  transform:translateY(115%);visibility:hidden;
+  transition:transform .7s cubic-bezier(.3,.9,.3,1), visibility 0s .7s;
+}
+.gallery::-webkit-scrollbar{display:none}
+.dived .gallery{transform:none;visibility:visible;transition:transform .9s cubic-bezier(.2,.9,.3,1) .45s, visibility 0s}
+.gallery .tag{opacity:1;flex:0 0 auto;border:0;background:none;font:inherit;color:var(--maroon);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.gallery .tag:focus-visible{outline:3px solid #e9b04c;outline-offset:4px}
+.thumb{padding:8px 8px 6px;rotate:var(--tilt,0deg)}
+.thumb img, .thumb video{display:block;width:124px;height:82px;object-fit:cover;position:relative;z-index:1;filter:sepia(.15) saturate(.95);pointer-events:none}
+.thumb .cap{
+  display:block;position:relative;z-index:1;margin-top:5px;max-width:124px;
+  font-family:"Permanent Marker", var(--body);font-size:12px;letter-spacing:.04em;text-transform:uppercase;
+  color:#5c0d11;mix-blend-mode:multiply;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.thumb.on{translate:0 -7px}
+.thumb.on img, .thumb.on video{outline:2px solid rgba(92,13,17,.55);outline-offset:2px}
+.back{align-self:center;padding:10px 16px 9px;font-family:"Permanent Marker", var(--body);font-size:15px;letter-spacing:.05em;text-transform:uppercase;rotate:-2deg}
+.desc{
+  position:fixed;z-index:2;left:max(18px, env(safe-area-inset-left, 0px));bottom:calc(var(--galH, 150px) + 14px);
+  width:min(380px, calc(100vw - 36px));padding:14px 20px 13px;text-align:left;rotate:-1deg;
+  opacity:0;translate:0 12px;pointer-events:none;transition:opacity .5s ease, translate .6s ease;
+}
+.dived .desc.has{opacity:1;translate:0 0}
+.desc h2{position:relative;z-index:1;margin:0 0 6px;font-family:"Permanent Marker", var(--body);font-weight:400;font-size:19px;letter-spacing:.03em;text-transform:uppercase;color:#5c0d11;mix-blend-mode:multiply}
+.desc p{position:relative;z-index:1;margin:0;font-family:var(--body);font-weight:600;font-size:14px;line-height:1.45;color:#3e2a1d}
+/* volume: a stitched thread with a sewing button for the handle (only while a video with sound plays) */
+.vol{position:relative;z-index:1;display:flex;align-items:center;gap:12px;margin:0;pointer-events:auto}
+/* the video controls: a muslin strip sewn on just under the burlap screen (positioned each frame to follow it) */
+.controls{position:fixed;z-index:2;left:0;top:0;padding:8px 18px 7px;width:max-content;max-width:calc(100vw - 24px);
+  filter:drop-shadow(0 4px 8px rgba(0,0,0,.45));pointer-events:none;transform:translate(-50%,0) rotate(-.6deg)}
+.controls.on{opacity:1;pointer-events:auto}
+.controls .vol input{width:clamp(90px, 14vw, 170px);flex:none}
+.vol[hidden]{display:none}
+.vol .vlab{font-family:"Permanent Marker", var(--body);font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#5c0d11;mix-blend-mode:multiply;cursor:pointer;user-select:none;min-width:0}
+.vol .vlab.play{min-width:52px}
+.vol .vlab:focus-visible{outline:2px solid #e9b04c;outline-offset:3px}
+/* full screen: the video leaves the muslin and fills the screen on black */
+#fsWrap{display:none}
+#fsWrap.on{display:flex;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;background:#000}
+#fsWrap.on video{display:block !important;width:100%;height:100%;object-fit:contain;background:#000}
+#fsClose{display:none}
+#fsWrap.on #fsClose{display:block;position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:calc(14px + env(safe-area-inset-right,0px));z-index:1;padding:8px 14px;border:1px solid rgba(255,255,255,.35);border-radius:6px;background:rgba(0,0,0,.45);color:#f3ead6;font-family:"Permanent Marker", var(--body);font-size:14px;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+#fsClose:focus-visible{outline:2px solid #e9b04c;outline-offset:2px}
+.vol input{-webkit-appearance:none;appearance:none;flex:1;height:18px;background:none;cursor:pointer;margin:0}
+.vol input::-webkit-slider-runnable-track{height:3px;border-radius:2px;background:repeating-linear-gradient(90deg,#6d1418 0 6px,transparent 6px 9px)}
+.vol input::-moz-range-track{height:3px;border-radius:2px;background:repeating-linear-gradient(90deg,#6d1418 0 6px,transparent 6px 9px)}
+.vol input::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7.5px;border-radius:50%;border:0;
+  background:radial-gradient(circle at 38% 38%,#4a090c 0 1.3px,transparent 1.6px),radial-gradient(circle at 62% 38%,#4a090c 0 1.3px,transparent 1.6px),
+             radial-gradient(circle at 38% 62%,#4a090c 0 1.3px,transparent 1.6px),radial-gradient(circle at 62% 62%,#4a090c 0 1.3px,transparent 1.6px),
+             radial-gradient(circle at 40% 35%,#c4574e,#8c2a27 70%);box-shadow:0 1px 2px rgba(40,10,5,.55)}
+.vol input::-moz-range-thumb{width:18px;height:18px;border-radius:50%;border:0;
+  background:radial-gradient(circle at 38% 38%,#4a090c 0 1.3px,transparent 1.6px),radial-gradient(circle at 62% 38%,#4a090c 0 1.3px,transparent 1.6px),
+             radial-gradient(circle at 38% 62%,#4a090c 0 1.3px,transparent 1.6px),radial-gradient(circle at 62% 62%,#4a090c 0 1.3px,transparent 1.6px),
+             radial-gradient(circle at 40% 35%,#c4574e,#8c2a27 70%);box-shadow:0 1px 2px rgba(40,10,5,.55)}
+.vol input:focus-visible{outline:2px solid #e9b04c;outline-offset:3px}
+@media (max-width:600px){
+  .thumb img, .thumb video{width:96px;height:64px}
+  .thumb .cap{max-width:96px;font-size:11px}
+  .gallery{gap:14px}
+}
+@media (prefers-reduced-motion: reduce){ .gallery, .dived .gallery, .desc{transition:none} }
 
 /* no-WebGL fallback: the still image */
 .no-gl #scene{display:none}
@@ -103,7 +174,7 @@ body{color:var(--maroon);font-family:var(--body)}
 <nav class="tags" aria-label="Site">
   <a class="tag home" href="./"><span class="label">Home</span></a>
   <span class="tag about" aria-disabled="true"><span class="label">About</span></span>
-  <span class="tag contact" aria-disabled="true"><span class="label">Contact</span></span>
+  <a class="tag contact" href="contact/"><span class="label">Contact</span></a>
 </nav>
 <script>
 // Fray the muslin tags: a slightly ragged cut edge plus loose threads poking out all round.
@@ -154,18 +225,26 @@ body{color:var(--maroon);font-family:var(--body)}
     label.appendChild(sr);
     for (const c of word) {
       const s = document.createElement('span');
-      s.className = 'ch'; s.setAttribute('aria-hidden', 'true'); s.textContent = c;
+      s.className = 'ch'; s.setAttribute('aria-hidden', 'true'); s.textContent = c === ' ' ? ' ' : c;
       s.style.transform = `translateY(${((R() - 0.5) * 2.6).toFixed(2)}px) rotate(${((R() - 0.5) * 10).toFixed(1)}deg) scale(${(0.93 + R() * 0.13).toFixed(3)})`;
       s.style.setProperty('--ang', `${(100 + R() * 45).toFixed(0)}deg`);
       label.appendChild(s);
     }
   }
   document.querySelectorAll('.label').forEach(sew);
+  window.campFray = fray; window.campSew = sew;   // the gallery (built later) frays and sews its own scraps
   const run = () => document.querySelectorAll('.tag').forEach(fray);
   (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(run);
 })();
 </script>
 <video id="film" src="assets/camp70s.mp4" muted loop playsinline autoplay preload="auto" style="display:none"></video>
+<div id="fsWrap"><video id="sel" loop playsinline preload="none" style="display:none"></video><button id="fsClose" type="button" aria-label="Close full screen">Close</button></div>
+<button class="sr-only" id="openRoom" type="button">Open the screening gallery</button>
+<section class="gallery" id="gallery" aria-label="Gallery"></section>
+<div class="tag desc" id="desc"><h2 id="descTitle" aria-live="polite"></h2><p id="descText"></p></div>
+<div class="tag controls" id="controls" aria-label="Video controls">
+  <div class="vol" id="vol" hidden><span class="vlab play" id="playBtn" role="button" tabindex="0" aria-label="Pause">Pause</span><span class="vlab" id="volLab" role="button" tabindex="0" aria-label="Mute">Vol</span><input id="volIn" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume"><span class="vlab full" id="fsBtn" role="button" tabindex="0" aria-label="Watch full screen">Full</span></div>
+</div>
 <noscript><style>body{background:#0a0f22 url("assets/cf-scene-wide.jpg") center/cover no-repeat}.home,.about,.contact{opacity:1;transform:none}</style></noscript>
 
 <script type="module">
@@ -185,6 +264,7 @@ const SETS = {
     ember: [0.504,0.452],
     beam: [[0.3786,0.5544],[0.6627,0.6128]], beamW: [0.012, 0.15],  // projector lens -> screen centre; half-width at each end (image-height units)
     fogY: [0.62, 0.95],                                              // mist hugs the far trunk bases, thinning above
+    sheetD: 0.63,                                                    // depth-map value at the screen (for clicking / diving in)
   },
   tall: {
     img: 'assets/cf-scene-tall.jpg', depth: 'assets/cf-depth-tall.jpg', sway: 'assets/cf-sway-tall.png', aspect: 1536/2752, segs: [150, 270], D: 0.6,
@@ -195,8 +275,23 @@ const SETS = {
     ember: [0.503,0.411],
     beam: [[0.316,0.473],[0.7321,0.5051]], beamW: [0.008, 0.07],
     fogY: [0.58, 0.95],
+    sheetD: 0.61,
   },
 };
+
+// ------------------------------------------------------------------
+// Screening-room gallery. Add your work here: type 'video' or 'image', the file, a thumbnail
+// (videos need one; images use themselves), a title and a short description.
+// The first entry is the '70s film that plays on the screen until someone picks something.
+// ------------------------------------------------------------------
+const GALLERY = [
+  { type: 'video', src: 'assets/camp70s.mp4', thumb: 'assets/poster.png', film: true,
+    title: "Camp Sandwich '70s", desc: 'Placeholder: our home-movie reel. Replace this with a line or two about the piece.' },
+  { type: 'video', src: 'assets/Orange_01_web.mp4', thumbAt: 75,
+    title: 'Orange', desc: "Made for a video jam where each filmmaker picked a track from Ken Nordine's spoken-word album Colors. I chose Orange." },
+  { type: 'image', src: 'assets/cf-scene-wide.jpg',
+    title: 'The Campsite', desc: 'Placeholder: another still. Replace this with your own description.' },
+];
 const LOGO_BOX = [34/1376, 1-694/768, 1170/1376, 1-538/768]; // u0,v0,u1,v1 of the lettering inside logo.png
 const LOGO_ASPECT = (1170-34)/(694-538);
 const PLANE_H = 2, FOV = 30, OVERSCAN = 1.1;
@@ -360,8 +455,10 @@ void main(){
 
   // ---- projection onto the sheet ----
   float m = smoothstep(0.0,0.03,sc.x) * smoothstep(1.0,0.97,sc.x) * smoothstep(0.0,0.035,sc.y) * smoothstep(1.0,0.965,sc.y);
+  // fit the whole picture inside the sheet (no cropping): wide pictures get dark bands above and below
   vec2 v2 = sc - 0.5;
-  if (uVidAspect > uSheetAspect) v2.x *= uSheetAspect/uVidAspect; else v2.y *= uVidAspect/uSheetAspect;
+  if (uVidAspect > uSheetAspect) v2.y *= uVidAspect/uSheetAspect; else v2.x *= uSheetAspect/uVidAspect;
+  float pm = smoothstep(0.5, 0.49, abs(v2.x)) * smoothstep(0.5, 0.49, abs(v2.y));   // inside the picture
   v2 += 0.5;
   vec3 film = mix(texture2D(uPoster, v2).rgb, texture2D(uVideo, v2).rgb, uVidReady);
   float Lw = 0.84;
@@ -372,8 +469,9 @@ void main(){
     film = mix(film, lg.rgb, lg.a * uTitle);
   }
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  vec3 proj = film * mix(1.0, lum / 0.72, 0.55) * 1.06;     // keep the muslin's weave and wrinkles
   vec3 unlit = col * vec3(0.30, 0.33, 0.42);
+  vec3 proj = film * mix(1.0, lum / 0.72, 0.55) * 1.06;     // keep the muslin's weave and wrinkles
+  proj = mix(unlit, proj, pm);                               // outside the picture the burlap stays dark
   vec3 offCol = mix(col, unlit, box);
   col = mix(offCol, mix(col, proj, m), uSheetOn);
 
@@ -580,6 +678,202 @@ const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 const easeOutBack = t => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 const rnd = n => { const x = Math.sin(n * 127.1) * 43758.5453; return x - Math.floor(x); };
 
+// ---------------- screening room ----------------
+const selVideo = document.getElementById('sel');
+const selTex = new THREE.VideoTexture(selVideo);
+selTex.colorSpace = THREE.NoColorSpace; selTex.minFilter = selTex.magFilter = THREE.LinearFilter; selTex.generateMipmaps = false;
+const imgCache = {};
+const room = { target: 0, p: 0, ready: false, current: null, src: 'film', mediaOk: false, swapAt: -1e9 };
+const galleryEl = document.getElementById('gallery'), descEl = document.getElementById('desc');
+selVideo.addEventListener('playing', () => { if (room.src === 'sel') room.mediaOk = true; });
+
+// volume (remembered between visits)
+const volEl = document.getElementById('vol'), volIn = document.getElementById('volIn'), volLab = document.getElementById('volLab');
+let vol = 0.8;
+try { const s = parseFloat(localStorage.getItem('campVol')); if (s >= 0 && s <= 1) vol = s; } catch (e) {}
+volIn.value = vol; selVideo.volume = vol;
+function showVol() {
+  const off = selVideo.muted || selVideo.volume === 0;
+  volLab.textContent = off ? 'Off' : 'Vol';
+  volLab.setAttribute('aria-label', off ? 'Unmute' : 'Mute');
+  volIn.value = selVideo.muted ? 0 : selVideo.volume;
+}
+volIn.addEventListener('input', () => {
+  vol = +volIn.value; selVideo.volume = vol; selVideo.muted = vol === 0;
+  try { localStorage.setItem('campVol', vol); } catch (e) {}
+  showVol();
+});
+function toggleMute() {
+  if (selVideo.muted || selVideo.volume === 0) { selVideo.muted = false; if (selVideo.volume === 0) selVideo.volume = vol = 0.8; }
+  else selVideo.muted = true;
+  showVol();
+}
+volLab.addEventListener('click', toggleMute);
+volLab.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMute(); } });
+selVideo.addEventListener('volumechange', showVol);
+
+const ctlEl = document.getElementById('controls'), _cv = new THREE.Vector3();
+
+// pause / play
+const playBtn = document.getElementById('playBtn'), fsBtn = document.getElementById('fsBtn'), fsWrap = document.getElementById('fsWrap');
+const showPlay = () => { const p = selVideo.paused; playBtn.textContent = p ? 'Play' : 'Pause'; playBtn.setAttribute('aria-label', p ? 'Play' : 'Pause'); };
+const togglePlay = () => { if (selVideo.paused) selVideo.play().catch(() => {}); else selVideo.pause(); };
+playBtn.addEventListener('click', togglePlay);
+selVideo.addEventListener('play', showPlay); selVideo.addEventListener('pause', showPlay);
+
+// full screen: the video comes off the muslin and fills the whole screen, with the browser's own controls
+let fsLeftAt = 0;
+function enterFs() {
+  fsWrap.classList.add('on'); selVideo.controls = true;
+  if (fsWrap.requestFullscreen) fsWrap.requestFullscreen().catch(() => {});   // if the browser says no, it still fills the window
+  else if (selVideo.webkitEnterFullscreen) selVideo.webkitEnterFullscreen();   // iPhone
+}
+function exitFs() {
+  fsWrap.classList.remove('on'); selVideo.controls = false; fsLeftAt = performance.now();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && fsWrap.classList.contains('on')) exitFs(); });
+selVideo.addEventListener('webkitendfullscreen', exitFs);
+fsBtn.addEventListener('click', enterFs);
+document.getElementById('fsClose').addEventListener('click', exitFs);
+addEventListener('keydown', e => { if (e.key === 'Escape' && fsWrap.classList.contains('on') && !document.fullscreenElement) exitFs(); });
+for (const [el, fn] of [[playBtn, togglePlay], [fsBtn, enterFs]]) el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+
+// what's on the burlap: the '70s film, a chosen video, or a chosen image
+function setMedia(item) {
+  room.swapAt = performance.now(); room.mediaOk = false;
+  if (!item || item.film) {
+    selVideo.pause(); room.src = 'film'; uniforms.uVideo.value = videoTex; tryPlay();
+  } else if (item.type === 'video') {
+    video.pause(); room.src = 'sel'; uniforms.uVideo.value = selTex;
+    selVideo.src = item.src; selVideo.volume = vol; selVideo.muted = vol === 0; selVideo.currentTime = 0;
+    selVideo.play().catch(() => { selVideo.muted = true; selVideo.play().catch(() => {}); });
+  } else {
+    video.pause(); selVideo.pause(); room.src = 'img';
+    (imgCache[item.src] ||= loadTex(item.src)).then(t => {
+      if (room.current !== item) return;
+      uniforms.uVideo.value = t; uniforms.uVidAspect.value = t.image.width / t.image.height; room.mediaOk = true;
+    });
+  }
+}
+
+function select(item, btn) {
+  room.current = item;
+  setMedia(item);
+  galleryEl.querySelectorAll('.thumb').forEach(b => b.classList.toggle('on', b === btn));
+  document.getElementById('descTitle').textContent = item.title;
+  document.getElementById('descText').textContent = item.desc;
+  volEl.hidden = !(item.type === 'video' && !item.film);   // the '70s film plays silent; other videos get pause, volume and full screen
+  showPlay();
+  showVol();
+  descEl.classList.add('has');
+  requestAnimationFrame(() => window.campFray?.(descEl));
+}
+
+function measureRoom() {
+  document.documentElement.style.setProperty('--galH', galleryEl.offsetHeight + 'px');
+}
+function enterRoom() {
+  if (room.target || !room.ready) return;
+  room.target = 1; document.body.classList.add('dived'); canvas.classList.remove('hot'); measureRoom();
+}
+function leaveRoom() {
+  if (!room.target) return;
+  if (fsWrap.classList.contains('on')) exitFs();
+  room.target = 0; document.body.classList.remove('dived');
+  room.current = null; descEl.classList.remove('has');
+  galleryEl.querySelectorAll('.thumb').forEach(b => b.classList.remove('on'));
+  setMedia(null);
+}
+
+// gallery row: a "back to camp" scrap, then one muslin scrap per piece
+(function buildGallery() {
+  const back = document.createElement('button');
+  back.type = 'button'; back.className = 'tag back';
+  back.innerHTML = '<span class="label">Back to camp</span>';
+  back.addEventListener('click', leaveRoom);
+  galleryEl.appendChild(back);
+  window.campSew?.(back.querySelector('.label'));
+  GALLERY.forEach((item, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tag thumb';
+    b.style.setProperty('--tilt', `${((i % 2 ? 1 : -1) * (0.8 + Math.random() * 1.4)).toFixed(1)}deg`);
+    // thumbnail: an image, or for a video with no thumbnail, a still frame from the video itself
+    let img;
+    if (item.type === 'video' && !item.thumb) {
+      img = document.createElement('video');
+      img.src = `${item.src}#t=${item.thumbAt ?? 3}`; img.muted = true; img.playsInline = true; img.preload = 'metadata';
+      img.setAttribute('aria-hidden', 'true'); img.tabIndex = -1;
+    } else {
+      img = document.createElement('img');
+      img.src = item.thumb || item.src; img.alt = ''; img.decoding = 'async';
+    }
+    const cap = document.createElement('span'); cap.className = 'cap'; cap.textContent = item.title;
+    b.append(img, cap);
+    b.setAttribute('aria-label', `${item.type === 'video' ? 'Play' : 'Show'} ${item.title}`);
+    b.addEventListener('click', () => select(item, b));
+    galleryEl.appendChild(b);
+  });
+  const fray = () => galleryEl.querySelectorAll('.tag').forEach(t => window.campFray?.(t));
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { fray(); measureRoom(); });
+  addEventListener('load', fray);
+})();
+
+// is a screen point on the burlap? cast a ray onto the plane the screen sits in, then test the quad
+const _ndc = new THREE.Vector3(), _dir = new THREE.Vector3();
+function cross2(ax, ay, bx, by) { return ax * by - ay * bx; }
+function invBilinear(px, py, q) {
+  const [[ax, ay], [bx, by], [cx, cy], [dx, dy]] = q;
+  const ex = bx - ax, ey = by - ay, fx = dx - ax, fy = dy - ay, gx = ax - bx + cx - dx, gy = ay - by + cy - dy, hx = px - ax, hy = py - ay;
+  const k2 = cross2(gx, gy, fx, fy), k1 = cross2(ex, ey, fx, fy) + cross2(hx, hy, gx, gy), k0 = cross2(hx, hy, ex, ey);
+  let v;
+  if (Math.abs(k2) < 1e-9) v = -k0 / k1;
+  else { const w = k1 * k1 - 4 * k0 * k2; if (w < 0) return null; v = (-k1 - Math.sqrt(w)) / (2 * k2); if (v < -0.5 || v > 1.5) v = (-k1 + Math.sqrt(w)) / (2 * k2); }
+  return [(hx - fx * v) / (ex + gx * v), v];
+}
+function onSheet(clientX, clientY) {
+  if (!set) return false;
+  _ndc.set(clientX / innerWidth * 2 - 1, -(clientY / innerHeight) * 2 + 1, 0.5).unproject(camera);
+  _dir.copy(_ndc).sub(camera.position).normalize();
+  const zS = (set.sheetD - 1) * set.D, tt = (zS - camera.position.z) / _dir.z;
+  if (!(tt > 0)) return false;
+  const k = (dist0 - zS) / dist0;
+  const u = (camera.position.x + _dir.x * tt) / (planeW * k) + 0.5, v = (camera.position.y + _dir.y * tt) / (PLANE_H * k) + 0.5;
+  const sc = invBilinear(u, v, set.sheet);
+  return !!sc && sc[0] > 0 && sc[0] < 1 && sc[1] > 0 && sc[1] < 1;
+}
+canvas.addEventListener('click', e => {
+  if (!room.ready) return;
+  const hit = onSheet(e.clientX, e.clientY);
+  if (!room.target && hit) enterRoom();
+  else if (room.target && !hit) leaveRoom();
+});
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  canvas.classList.toggle('hot', room.ready && !room.target && onSheet(e.clientX, e.clientY));
+});
+addEventListener('keydown', e => { if (e.key === 'Escape' && !document.fullscreenElement && performance.now() - fsLeftAt > 500) leaveRoom(); });   // Esc that just closed full screen doesn't also leave the room
+document.querySelector('.home').addEventListener('click', e => { if (room.target) { e.preventDefault(); leaveRoom(); } });
+document.getElementById('openRoom').addEventListener('click', enterRoom);
+addEventListener('resize', () => { if (room.target) measureRoom(); });
+
+// where the camera sits when dived in: the screen centred in the space above the gallery (and the caption on phones)
+const _dv = { px: 0, py: 0, pz: 0, ly: 0, lz: 0 };
+function diveView() {
+  const zS = (set.sheetD - 1) * set.D;
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const [u, v] of set.sheet) { const [x, y] = uvToWorld(u, v, zS); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const A = innerWidth / innerHeight;
+  let bottom = ((galleryEl.offsetHeight || 150) + 58) / innerHeight;   // + room for the controls strip under the screen
+  if (A < 1.2) bottom += ((descEl.offsetHeight || 110) + 14) / innerHeight;   // narrow screens: the caption sits under the screen
+  const top = 72 / innerHeight, avail = Math.max(0.3, 1 - bottom - top);
+  const tanH = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+  const d = Math.max((y1 - y0) / (avail * 0.92), (x1 - x0) / (A * 0.94)) / (2 * tanH);
+  const off = (bottom - top) / 2 * (2 * d * tanH);
+  _dv.px = (x0 + x1) / 2; _dv.py = (y0 + y1) / 2 - off; _dv.pz = zS + d; _dv.ly = _dv.py; _dv.lz = zS;
+  return _dv;
+}
+
 // ---------------- start ----------------
 await Promise.all([
   loadTex('assets/poster.png').then(t => { posterTex = t; uniforms.uPoster.value = t; }),
@@ -613,6 +907,14 @@ function frame(now) {
   const beamFlick = 0.82 + 0.18 * rnd(Math.floor(time * 24) + 0.5) + 0.06 * Math.sin(time * 0.7);
   const title = smooth(3.0, 3.9, t);
   if (!tagsShown && t > 3.5) { tagsShown = true; document.body.classList.add('show'); }
+  room.ready = t > 4.2;
+
+  // dive into the screen and back out (eased); the title card fades while you're in the screening room
+  room.p = reduceMotion ? room.target : clamp01(room.p + (room.target ? dt : -dt) / 1.35);
+  const dive = easeInOut(room.p);
+  // changing the picture: the projector blinks off and back on, like threading a new reel
+  const sw = (now - room.swapAt) / 1000;
+  if (sw < 0.55) sheetOn *= sw < 0.12 ? 0.2 : (sw < 0.2 ? 0.7 : (sw < 0.26 ? 0.35 : 0.35 + 0.65 * smooth(0.26, 0.55, sw)));
 
   const flick = 1 + 0.07 * Math.sin(time * 13) + 0.05 * Math.sin(time * 7.7 + 1) + 0.04 * Math.sin(time * 23 + 2) + 0.03 * (rnd(Math.floor(time * 18)) - 0.5);
 
@@ -621,16 +923,18 @@ function frame(now) {
   uniforms.uPuff.value = puff * 0.8 + Math.max(0, fireOn - 1) * 2;
   uniforms.uAmbient.value = ambient;
   uniforms.uSheetOn.value = sheetOn;
-  uniforms.uTitle.value = title;
+  uniforms.uTitle.value = title * (1 - dive);
   uniforms.uFlick.value = flick;
   uniforms.uBeamFlick.value = reduceMotion ? 1 : beamFlick;
-  uniforms.uVidReady.value += (videoReady - uniforms.uVidReady.value) * Math.min(1, dt * 3);
-  if (video.videoWidth) uniforms.uVidAspect.value = video.videoWidth / video.videoHeight;
+  const mediaWant = room.src === 'film' ? videoReady : (room.mediaOk ? 1 : 0);
+  uniforms.uVidReady.value += (mediaWant - uniforms.uVidReady.value) * Math.min(1, dt * 6);
+  if (room.src === 'film' && video.videoWidth) uniforms.uVidAspect.value = video.videoWidth / video.videoHeight;
+  else if (room.src === 'sel' && selVideo.videoWidth) uniforms.uVidAspect.value = selVideo.videoWidth / selVideo.videoHeight;
 
   // camera: push out from the fire, then drift with the mouse / tilt
   const camP = easeInOut(clamp01(t / 4.4));
   const [fx, fy] = uvToWorld(set.fire[0], set.fire[1] + 0.06);
-  const k = reduceMotion ? 0 : 1;
+  const k = (reduceMotion ? 0 : 1) * (1 - dive);   // no mouse / tilt drift while dived in
   drift.x += (ptr.x - drift.x) * Math.min(1, dt * 2.2);
   drift.y += (ptr.y - drift.y) * Math.min(1, dt * 2.2);
   const bx = Math.sin(time * 0.23) * 0.05 * k, by = Math.sin(time * 0.31) * 0.03 * k;
@@ -640,7 +944,32 @@ function frame(now) {
   const dX = (drift.x * 0.32 + bx) * camP * k, dY = (-drift.y * 0.18 + by) * camP * k;
   camera.position.set(ox + dX, oy + dY, dz);
   look.set(ox, oy, -set.D * 0.5);
+  if (dive > 0) {
+    const v = diveView();
+    camera.position.set(
+      camera.position.x + (v.px - camera.position.x) * dive,
+      camera.position.y + (v.py - camera.position.y) * dive,
+      camera.position.z + (v.pz - camera.position.z) * dive);
+    look.set(look.x + (v.px - look.x) * dive, look.y + (v.ly - look.y) * dive, look.z + (v.lz - look.z) * dive);
+  }
   camera.lookAt(look);
+
+  // keep the controls strip pinned just under the bottom edge of the burlap
+  const ctlOn = dive > 0.97 && !volEl.hidden;
+  if (ctlOn) {
+    camera.updateMatrixWorld();
+    const zS = (set.sheetD - 1) * set.D;
+    const a = _cv.set(...uvToWorld(set.sheet[0][0], set.sheet[0][1], zS)).project(camera);
+    const ax = (a.x + 1) / 2 * innerWidth, ay = (1 - a.y) / 2 * innerHeight;
+    const b = _cv.set(...uvToWorld(set.sheet[1][0], set.sheet[1][1], zS)).project(camera);
+    const bx = (b.x + 1) / 2 * innerWidth, by = (1 - b.y) / 2 * innerHeight;
+    ctlEl.style.left = ((ax + bx) / 2).toFixed(1) + 'px';
+    ctlEl.style.top = (Math.max(ay, by) + 6).toFixed(1) + 'px';
+  }
+  if (ctlOn !== ctlEl.classList.contains('on')) {
+    ctlEl.classList.toggle('on', ctlOn);
+    if (ctlOn) requestAnimationFrame(() => window.campFray?.(ctlEl));
+  }
 
   // embers
   const [ex, ey] = uvToWorld(set.ember[0], set.ember[1], 0.02);
